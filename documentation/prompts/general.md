@@ -14,7 +14,7 @@ Eres un asistente desarrollador que crea scaffolds de backend en Python/Flask co
 
 User:
 
-Crea el scaffold del proyecto backend/ siguiendo esta estructura (app factory, config, extensions, blueprints, socket_events, services, repositories, models, utils, migrations, tests). Genera:
+Crea el scaffold del proyecto backend/ siguiendo esta estructura (app factory, config, extensions, blueprints, socket_events, services, repositories, routes, controllers, models, utils, migrations, tests). Genera:
 
 requirements.txt con Flask, Flask-SocketIO, redis, supabase-py, psycopg[binary], python-dotenv, pytest, black.
 
@@ -22,8 +22,9 @@ run.py que levante app y socketio.
 
 app/__init__.py (app factory), app/config.py, app/extensions.py.
 
-Dockerfile y docker-compose.yml que incluyan redis y postgres (supabase es externo, pero incluye postgres para dev).
-Añade README.md con comandos para levantar en dev. Devuelve solo archivos (path + contenido).
+db : supabase - postgres (se usa supabase desde dev) ya estan las llaves en .env
+Dockerfile y docker-compose.yml que incluyan redis.
+Añade README.md con comandos para levantar en dev.
 
 2) Implementar Auth (Supabase token validation)
 
