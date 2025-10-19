@@ -257,3 +257,123 @@ class StreamingService:
                 "code": "RESUME_ERROR",
                 "message": str(e)
             })
+    
+    def stream_explanation(self, explanation: Dict, emit_func=None) -> None:
+        """
+        Stream de explicación de examen (sin sesión Redis)
+        
+        Args:
+            explanation: Datos de la explicación con explanation_steps
+            emit_func: Función emit de Socket.IO (opcional)
+        """
+        if emit_func is None:
+            emit_func = emit
+        
+        try:
+            steps = explanation.get('explanation_steps', [])
+            
+            for step in steps:
+                step_number = step.get('step_number', 0)
+                
+                # Emit inicio de paso
+                emit_func('step_start', {
+                    'step_number': step_number,
+                    'title': step.get('title', ''),
+                    'content_type': step.get('content_type', 'text'),
+                    'has_visual': step.get('has_visual', False)
+                })
+                
+                # Stream de contenido
+                content = step.get('content', '')
+                self._stream_content_simple(content, step_number, emit_func)
+                
+                # Canvas commands si existen
+                if step.get('has_visual') and step.get('canvas_commands'):
+                    for command in step['canvas_commands']:
+                        emit_func('canvas_command', {
+                            'step_number': step_number,
+                            'command': command
+                        })
+                        time.sleep(0.1)
+                
+                # Emit fin de paso
+                emit_func('step_complete', {
+                    'step_number': step_number
+                })
+                
+        except Exception as e:
+            print(f"Error en stream_explanation: {e}")
+            emit_func('error', {
+                'code': 'STREAMING_ERROR',
+                'message': str(e)
+            })
+    
+    def stream_answer(self, answer: Dict, emit_func=None) -> None:
+        """
+        Stream de respuesta (ai_answers) para follow-ups
+        
+        Args:
+            answer: Datos de la respuesta con answer_steps
+            emit_func: Función emit de Socket.IO (opcional)
+        """
+        if emit_func is None:
+            emit_func = emit
+        
+        try:
+            steps = answer.get('answer_steps', [])
+            
+            for step in steps:
+                step_number = step.get('step_number', 0)
+                
+                # Emit inicio de paso
+                emit_func('step_start', {
+                    'step_number': step_number,
+                    'title': step.get('title', ''),
+                    'content_type': step.get('content_type', 'text'),
+                    'has_visual': step.get('has_visual', False)
+                })
+                
+                # Stream de contenido
+                content = step.get('content', '')
+                self._stream_content_simple(content, step_number, emit_func)
+                
+                # Canvas commands si existen
+                if step.get('has_visual') and step.get('canvas_commands'):
+                    for command in step['canvas_commands']:
+                        emit_func('canvas_command', {
+                            'step_number': step_number,
+                            'command': command
+                        })
+                        time.sleep(0.1)
+                
+                # Emit fin de paso
+                emit_func('step_complete', {
+                    'step_number': step_number
+                })
+                
+        except Exception as e:
+            print(f"Error en stream_answer: {e}")
+            emit_func('error', {
+                'code': 'STREAMING_ERROR',
+                'message': str(e)
+            })
+    
+    def _stream_content_simple(self, content: str, step_number: int, emit_func) -> None:
+        """
+        Stream simple de contenido sin manejo de sesión
+        
+        Args:
+            content: Contenido a enviar
+            step_number: Número del paso
+            emit_func: Función emit
+        """
+        chunks = [content[i:i + self.CHUNK_SIZE] for i in range(0, len(content), self.CHUNK_SIZE)]
+        
+        for i, chunk in enumerate(chunks):
+            emit_func('content_chunk', {
+                'step_number': step_number,
+                'chunk': chunk,
+                'position': i * self.CHUNK_SIZE,
+                'is_final': i == len(chunks) - 1
+            })
+            time.sleep(self.CHUNK_DELAY)

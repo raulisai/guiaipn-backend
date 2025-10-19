@@ -7,6 +7,11 @@ import os
 from typing import Optional, Dict, List
 from openai import OpenAI
 from app.config import Config
+from app.prompts import (
+    get_exam_question_prompt,
+    get_clarification_prompt,
+    get_follow_up_prompt
+)
 
 
 class AIResponseError(Exception):
@@ -302,3 +307,138 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
         
         if not isinstance(response["total_duration"], (int, float)):
             raise JSONParseError("'total_duration' debe ser un número")
+    
+    def generate_exam_explanation(
+        self,
+        question: dict,
+        user_answer: str = None,
+        model: str = None
+    ) -> Dict:
+        """
+        Genera explicación para pregunta de examen usando prompt modular
+        
+        Args:
+            question: Diccionario con datos de la pregunta
+            user_answer: Respuesta del usuario (opcional)
+            model: Modelo de OpenAI a usar (opcional)
+            
+        Returns:
+            dict: {
+                "explanation_steps": [...],
+                "total_duration": int
+            }
+        """
+        prompt = get_exam_question_prompt(question, user_answer)
+        model = model or self.DEFAULT_MODEL
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.MAX_TOKENS,
+                temperature=self.TEMPERATURE,
+                response_format={"type": "json_object"}
+            )
+            
+            content = response.choices[0].message.content
+            parsed = json.loads(content)
+            
+            return parsed
+            
+        except Exception as e:
+            print(f"Error generando explicación de examen: {e}")
+            raise AIResponseError(f"Error al generar explicación: {str(e)}")
+    
+    def generate_clarification(
+        self,
+        clarification_question: str,
+        current_context: dict,
+        model: str = None
+    ) -> Dict:
+        """
+        Genera respuesta breve para interrupción/aclaración
+        
+        Args:
+            clarification_question: Pregunta del usuario
+            current_context: Contexto actual de la explicación
+            model: Modelo de OpenAI a usar (opcional)
+            
+        Returns:
+            dict: {
+                "clarification_steps": [...],
+                "total_duration": int
+            }
+        """
+        prompt = get_clarification_prompt(clarification_question, current_context)
+        model = model or self.DEFAULT_MODEL
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,  # Más corto para aclaraciones
+                temperature=self.TEMPERATURE,
+                response_format={"type": "json_object"}
+            )
+            
+            content = response.choices[0].message.content
+            parsed = json.loads(content)
+            
+            return parsed
+            
+        except Exception as e:
+            print(f"Error generando aclaración: {e}")
+            raise AIResponseError(f"Error al generar aclaración: {str(e)}")
+    
+    def generate_follow_up(
+        self,
+        follow_up_question: str,
+        original_question: dict,
+        previous_explanation: dict = None,
+        model: str = None
+    ) -> Dict:
+        """
+        Genera respuesta completa para pregunta adicional (follow-up)
+        
+        Args:
+            follow_up_question: Pregunta adicional del usuario
+            original_question: Pregunta de examen original
+            previous_explanation: Explicación previa (opcional)
+            model: Modelo de OpenAI a usar (opcional)
+            
+        Returns:
+            dict: {
+                "answer_steps": [...],
+                "total_duration": int
+            }
+        """
+        prompt = get_follow_up_prompt(
+            follow_up_question,
+            original_question,
+            previous_explanation
+        )
+        model = model or self.DEFAULT_MODEL
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.MAX_TOKENS,
+                temperature=self.TEMPERATURE,
+                response_format={"type": "json_object"}
+            )
+            
+            content = response.choices[0].message.content
+            parsed = json.loads(content)
+            
+            return parsed
+            
+        except Exception as e:
+            print(f"Error generando follow-up: {e}")
+            raise AIResponseError(f"Error al generar follow-up: {str(e)}")

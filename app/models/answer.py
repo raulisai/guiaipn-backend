@@ -18,16 +18,17 @@ class AnswerStep:
 
 @dataclass
 class Answer:
-    """Respuesta completa estructurada"""
+    """Respuesta completa estructurada (para preguntas libres y follow-ups)"""
     question_hash: str
     question_text: str
     steps: List[AnswerStep]
     total_duration: int
     generated_by: str = "manual"
+    related_question_id: Optional[str] = None  # Para follow-up questions
     
     def to_dict(self) -> dict:
         """Convierte a diccionario"""
-        return {
+        data = {
             "question_hash": self.question_hash,
             "question_text": self.question_text,
             "answer_steps": [
@@ -44,3 +45,8 @@ class Answer:
             "total_duration": self.total_duration,
             "generated_by": self.generated_by
         }
+        
+        if self.related_question_id:
+            data["related_question_id"] = self.related_question_id
+            
+        return data

@@ -12,88 +12,108 @@ Auth: Supabase Auth (Google OAuth)
 IA: OpenAI API
 Transcripción: Web Speech API (MVP)
 
-2. ESTRUCTURA DE ARCHIVOS
+2. ESTRUCTURA DE ARCHIVOS (✅ IMPLEMENTADA)
 -------------------------
 backend/
 ├── app/
-│   ├── __init__.py              # app factory (Flask + SocketIO)
-│   ├── config.py
-│   ├── extensions.py            # db, redis, socketio, swagger
-│   ├── prompts.py               # ⭐ NUEVO: Prompts modulares de IA
+│   ├── __init__.py              # ✅ app factory (Flask + SocketIO)
+│   ├── config.py                # ✅ Configuración
+│   ├── extensions.py            # ✅ Redis, Supabase, SocketIO
 │   │
-│   ├── api/                     # HTTP API (Blueprints = controllers)
+│   ├── prompts/                 # ✅ Prompts modulares de IA
 │   │   ├── __init__.py
-│   │   ├── v1/
-│   │   │   ├── __init__.py
-│   │   │   ├── auth_routes.py       # /api/v1/auth
-│   │   │   ├── question_routes.py   # /api/v1/questions
-│   │   │   └── session_routes.py
+│   │   ├── exam_prompts.py           # ✅ Explicaciones de examen
+│   │   ├── clarification_prompts.py  # ✅ Aclaraciones rápidas
+│   │   ├── follow_up_prompts.py      # ✅ Preguntas adicionales
+│   │   └── question_prompts.py       # ✅ Preguntas libres
 │   │
-│   ├── auth/
+│   ├── api/                     # ✅ HTTP API (Blueprints)
 │   │   ├── __init__.py
-│   │   ├── decorators.py    # @require_auth
-│   │   └── supabase.py      # Cliente Supabase
+│   │   ├── swagger.py                # ✅ Swagger UI
+│   │   ├── openapi.yaml              # ✅ Documentación OpenAPI
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── auth_routes.py        # ✅ /api/v1/auth
+│   │       ├── question_routes.py    # ✅ /api/v1/questions (GET /random, POST /{id}/answer)
+│   │       └── session_routes.py     # ✅ /api/v1/sessions
 │   │
-│   ├── socket_events/    # SocketIO handlers (thin controllers)
+│   ├── auth/                    # ✅ Autenticación
 │   │   ├── __init__.py
-│   │   ├── connection.py         # connect/disconnect
-│   │   ├── explanations.py       # ⭐ NUEVO: start_explanation
-│   │   ├── interruptions.py      # ⭐ NUEVO: interrupt_explanation
-│   │   ├── questions.py          # ask_question (preguntas libres)
-│   │   ├── voice.py              # voice_start, voice_complete
-│   │   └── playback.py           # pause, resume
+│   │   ├── decorators.py             # ✅ @require_auth
+│   │   └── supabase.py               # ✅ Cliente Supabase
 │   │
-│   ├── services/                # lógica de negocio
+│   ├── socket_events/           # ✅ SocketIO handlers
 │   │   ├── __init__.py
-│   │   ├── exam_service.py           # ⭐ NUEVO: Lógica de exámenes
-│   │   ├── explanation_service.py    # ⭐ NUEVO: Genera explicaciones
-│   │   ├── question_service.py       # Preguntas libres
-│   │   ├── ai_service.py             # Integración OpenAI
-│   │   ├── streaming_service.py      # Streaming de chunks
-│   │   ├── voice_service.py
-│   │   └── session_service.py
+│   │   ├── connection.py             # ✅ connect/disconnect
+│   │   ├── explanations.py           # ✅ start_explanation, feedback
+│   │   ├── interruptions.py          # ✅ interrupt_explanation, resume
+│   │   ├── follow_ups.py             # ✅ ask_follow_up_question
+│   │   ├── questions.py              # ✅ ask_question (preguntas libres)
+│   │   ├── voice.py                  # ✅ voice_start, voice_complete
+│   │   └── playback.py               # ✅ pause, resume
 │   │
-│   ├── repositories/
+│   ├── services/                # ✅ Lógica de negocio
 │   │   ├── __init__.py
-│   │   ├── question_repo.py              # Banco de preguntas
-│   │   ├── exam_explanation_repo.py      # ⭐ NUEVO: Explicaciones de examen
-│   │   ├── ai_answers_repo.py            # Preguntas libres
-│   │   └── session_repo.py               # Redis ops
+│   │   ├── exam_service.py           # ✅ Lógica de exámenes
+│   │   ├── explanation_service.py    # ✅ Genera explicaciones
+│   │   ├── question_service.py       # ✅ Preguntas libres
+│   │   ├── ai_service.py             # ✅ Integración OpenAI
+│   │   ├── streaming_service.py      # ✅ Streaming de chunks
+│   │   ├── voice_service.py          # ✅ Transcripción voz
+│   │   └── session_service.py        # ✅ Gestión sesiones Redis
 │   │
-│   ├── models/
+│   ├── repositories/            # ✅ Acceso a datos
 │   │   ├── __init__.py
-│   │   ├── answer.py            # Esquema respuestas
-│   │   ├── explanation.py       # ⭐ NUEVO: Esquema explicaciones
-│   │   ├── session.py           # Esquema sesiones
-│   │   └── voice.py             # Esquema interacciones voz
+│   │   ├── question_repo.py          # ✅ Banco de preguntas
+│   │   ├── exam_explanation_repo.py  # ✅ Explicaciones de examen
+│   │   ├── ai_answers_repo.py        # ✅ Preguntas libres
+│   │   ├── session_repo.py           # ✅ Redis ops (deprecated)
+│   │   └── session_repository.py     # ✅ Redis ops (actual)
 │   │
-│   └── utils/
+│   ├── models/                  # ✅ Esquemas de datos
+│   │   ├── __init__.py
+│   │   ├── answer.py                 # ✅ Respuestas (con related_question_id)
+│   │   ├── explanation.py            # ✅ Explicaciones de examen
+│   │   ├── session.py                # ✅ Sesiones
+│   │   └── voice.py                  # ✅ Interacciones voz
+│   │
+│   └── utils/                   # ✅ Utilidades
 │       ├── __init__.py
-│       ├── text_processing.py     # Normalizar, hash
-│       ├── canvas_commands.py     # Generar comandos dibujo
-│       ├── validators.py          # Validaciones
-│       └── rate_limiter.py        # Control de rate
+│       ├── text_processing.py        # ✅ Normalizar, hash
+│       ├── canvas_commands.py        # ✅ Comandos canvas
+│       ├── validators.py             # ✅ Validaciones
+│       └── rate_limiter.py           # ✅ Control de rate
 │
-├── migrations/              # SQL migrations para Supabase
-│   ├── 001_create_tables.sql
-│   ├── 002_add_indexes.sql
-│   └── 003_seed_data.sql
-├── tests/
+├── documentation/               # ✅ Documentación
+│   ├── architecture/
+│   │   ├── architecture-guiaIpn.md   # ✅ Este archivo
+│   │   └── Diagrama_stream_guiaipn.svg
+│   ├── db/
+│   │   └── schema_complete.sql       # ✅ Schema actualizado
+│   ├── prompts/
+│   │   └── general.md
+│   └── REDIS_SESSIONS.md             # ✅ Doc de sesiones
+│
+├── migrations/                  # ⏳ SQL migrations
+│   └── README.md
+│
+├── tests/                       # ✅ Tests
 │   ├── unit/
 │   ├── integration/
 │   └── conftest.py
-├── .env
-├── .env.example
-├── .gitignore
-├── .pre-commit-config.yaml
-├── .python-version
-├── .vscode/
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── run.py
-└── README.md
-
+│
+├── .env                         # ✅ Variables de entorno
+├── .env.example                 # ✅ Template
+├── .gitignore                   # ✅
+├── .dockerignore                # ✅
+├── Dockerfile                   # ✅
+├── docker-compose.yml           # ✅
+├── docker-compose.redis-only.yml # ✅
+├── requirements.txt             # ✅
+├── run.py                       # ✅
+├── README.md                    # ✅
+├── IMPLEMENTATION_COMPLETE.md   # ✅ Guía de implementación
+└── pytest.ini                   # ✅
 
 3. FLUJO UNIFICADO DEL SISTEMA
 -------------------------------

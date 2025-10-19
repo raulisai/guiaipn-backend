@@ -81,6 +81,38 @@ class QuestionRepository:
             print(f"Error obteniendo preguntas por materia: {e}")
             return []
     
+    def get_random_by_subject(self, subject: str, difficulty: str = None) -> dict:
+        """
+        Obtiene una pregunta aleatoria por materia
+        
+        Args:
+            subject: Nombre de la materia
+            difficulty: Dificultad opcional (easy, medium, hard)
+            
+        Returns:
+            dict: Pregunta aleatoria o None
+        """
+        try:
+            import random
+            
+            query = self.supabase.table(self.table)\
+                .select("*")\
+                .eq("subject", subject)
+            
+            if difficulty:
+                query = query.eq("difficulty", difficulty)
+            
+            response = query.execute()
+            
+            if response.data and len(response.data) > 0:
+                return random.choice(response.data)
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error obteniendo pregunta aleatoria: {e}")
+            return None
+    
     def increment_stats(self, question_id: str, correct: bool = False):
         """
         Incrementa estadísticas de una pregunta
