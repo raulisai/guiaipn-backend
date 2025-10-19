@@ -74,14 +74,17 @@ CREATE TABLE questions (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Respuestas IA precalculadas
+-- Respuestas IA precalculadas (para preguntas adicionales/follow-up)
 CREATE TABLE ai_answers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     question_hash TEXT UNIQUE NOT NULL, -- SHA256 de la pregunta normalizada
     question_text TEXT NOT NULL,
     
+    -- Relación opcional con pregunta de examen
+    related_question_id UUID REFERENCES questions(id), -- NULL si es pregunta libre
+    
     -- Respuesta estructurada
-    answer_steps JSONB NOT NULL, -- Array de pasos de explicación
+    answer_steps JSONB NOT NULL, -- Array de pasos de explicación COMPLETA (3-5 pasos)
     total_duration INTEGER DEFAULT 60, -- segundos estimados
     
     -- Estadísticas
@@ -95,6 +98,42 @@ CREATE TABLE ai_answers (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ⭐ NUEVA TABLA: Explicaciones especializadas para preguntas de examen
+CREATE TABLE exam_question_explanations (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+    
+    -- Contenido de la explicación
+    explanation_steps JSONB NOT NULL, -- Array de pasos estructurados
+    total_duration INTEGER DEFAULT 60, -- segundos estimados
+    
+    -- Calidad y validación
+    quality_score NUMERIC(3,2) DEFAULT 0.00, -- 0.00 a 1.00 (calculado automáticamente)
+    is_verified BOOLEAN DEFAULT FALSE, -- Verificada por humano
+    is_flagged BOOLEAN DEFAULT FALSE, -- Marcada con error por usuarios
+    flag_reason TEXT, -- Razón del flag si existe
+    
+    -- Estadísticas de uso
+    usage_count INTEGER DEFAULT 0,
+    helpful_votes INTEGER DEFAULT 0, -- Votos "fue útil"
+    unhelpful_votes INTEGER DEFAULT 0, -- Votos "no fue útil"
+    total_votes INTEGER DEFAULT 0,
+    
+    -- Metadata de generación
+    generated_by TEXT DEFAULT 'ai', -- ai, manual, reviewed
+    ai_model TEXT, -- gpt-4, gpt-3.5-turbo, etc
+    prompt_version TEXT, -- Para tracking de versiones de prompts (ej: "v1.0")
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    verified_at TIMESTAMPTZ,
+    verified_by UUID REFERENCES auth.users(id),
+    
+    -- Constraint: Una explicación por pregunta
+    UNIQUE(question_id)
+);
+
 -- Historial de interacciones
 CREATE TABLE interactions (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -104,8 +143,9 @@ CREATE TABLE interactions (
     -- Pregunta y respuesta
     question_text TEXT NOT NULL,
     question_type TEXT DEFAULT 'text', -- text, voice, exam
-    answer_id UUID REFERENCES ai_answers(id),
-    question_id UUID REFERENCES questions(id),
+    answer_id UUID REFERENCES ai_answers(id), -- Para preguntas libres
+    question_id UUID REFERENCES questions(id), -- Para preguntas de examen
+    explanation_id UUID REFERENCES exam_question_explanations(id), -- Para explicaciones de examen
     
     -- Métricas
     response_time_ms INTEGER,
@@ -244,11 +284,20 @@ CREATE INDEX idx_profiles_user ON profiles(id);
 CREATE INDEX idx_questions_subject ON questions(subject, difficulty);
 CREATE INDEX idx_questions_code ON questions(code);
 CREATE INDEX idx_ai_answers_hash ON ai_answers(question_hash);
+CREATE INDEX idx_ai_answers_related_question ON ai_answers(related_question_id);
 CREATE INDEX idx_interactions_user ON interactions(user_id, created_at DESC);
 CREATE INDEX idx_interactions_session ON interactions(session_id);
+CREATE INDEX idx_interactions_explanation ON interactions(explanation_id);
 CREATE INDEX idx_study_sessions_user ON study_sessions(user_id, started_at DESC);
 CREATE INDEX idx_user_progress_user ON user_progress(user_id, subject);
 CREATE INDEX idx_credit_usage_user ON credit_usage(user_id, created_at DESC);
+
+-- Índices para exam_question_explanations
+CREATE INDEX idx_exam_explanations_question ON exam_question_explanations(question_id);
+CREATE INDEX idx_exam_explanations_quality ON exam_question_explanations(quality_score DESC);
+CREATE INDEX idx_exam_explanations_verified ON exam_question_explanations(is_verified) WHERE is_verified = true;
+CREATE INDEX idx_exam_explanations_flagged ON exam_question_explanations(is_flagged) WHERE is_flagged = true;
+CREATE INDEX idx_exam_explanations_usage ON exam_question_explanations(usage_count DESC);
 
 -- Índices para búsqueda de texto
 CREATE INDEX idx_questions_search ON questions USING gin(to_tsvector('spanish', question));
@@ -417,6 +466,10 @@ CREATE TRIGGER trigger_user_progress_updated_at
     BEFORE UPDATE ON user_progress 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+CREATE TRIGGER trigger_exam_explanations_updated_at 
+    BEFORE UPDATE ON exam_question_explanations 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
 -- =========================================
 -- 6. ROW LEVEL SECURITY (RLS)
 -- =========================================
@@ -428,6 +481,7 @@ ALTER TABLE study_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE credit_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exam_question_explanations ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para profiles
 CREATE POLICY "Users can view own profile" 
@@ -470,6 +524,15 @@ CREATE POLICY "Users can view own credit usage"
 CREATE POLICY "Users can view own subscription" 
     ON user_subscriptions FOR SELECT 
     USING (auth.uid() = user_id);
+
+-- Políticas para exam_question_explanations
+CREATE POLICY "Anyone can view explanations" 
+    ON exam_question_explanations FOR SELECT 
+    USING (true);
+
+CREATE POLICY "Service role can manage explanations" 
+    ON exam_question_explanations FOR ALL 
+    USING (auth.role() = 'service_role');
 
 -- Las tablas públicas no necesitan RLS
 -- questions, ai_answers, canvas_library son públicas
@@ -650,7 +713,8 @@ $$ LANGUAGE plpgsql;
 
 COMMENT ON TABLE profiles IS 'Perfiles de usuario con información de créditos y suscripción';
 COMMENT ON TABLE questions IS 'Banco de preguntas del examen IPN/UNAM';
-COMMENT ON TABLE ai_answers IS 'Respuestas pre-generadas o cacheadas de IA';
+COMMENT ON TABLE ai_answers IS 'Respuestas pre-generadas o cacheadas de IA para preguntas libres y follow-ups';
+COMMENT ON TABLE exam_question_explanations IS 'Explicaciones especializadas para preguntas de examen con métricas de calidad';
 COMMENT ON TABLE interactions IS 'Historial completo de interacciones usuario-sistema';
 COMMENT ON TABLE study_sessions IS 'Sesiones de estudio con métricas';
 COMMENT ON TABLE user_progress IS 'Progreso del usuario por materia';
@@ -670,7 +734,8 @@ COMMENT ON FUNCTION process_question IS 'Procesa una pregunta y gestiona crédit
 DO $$
 BEGIN
     RAISE NOTICE 'Esquema de base de datos creado exitosamente';
-    RAISE NOTICE 'Tablas principales: profiles, questions, ai_answers, interactions';
+    RAISE NOTICE 'Tablas principales: profiles, questions, ai_answers, exam_question_explanations, interactions';
     RAISE NOTICE 'Sistema de créditos configurado';
+    RAISE NOTICE 'Sistema de explicaciones de examen configurado';
     RAISE NOTICE 'RLS habilitado para protección de datos';
 END $$;

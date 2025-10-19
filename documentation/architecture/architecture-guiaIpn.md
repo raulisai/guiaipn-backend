@@ -19,6 +19,7 @@ backend/
 │   ├── __init__.py              # app factory (Flask + SocketIO)
 │   ├── config.py
 │   ├── extensions.py            # db, redis, socketio, swagger
+│   ├── prompts.py               # ⭐ NUEVO: Prompts modulares de IA
 │   │
 │   ├── api/                     # HTTP API (Blueprints = controllers)
 │   │   ├── __init__.py
@@ -35,34 +36,36 @@ backend/
 │   │
 │   ├── socket_events/    # SocketIO handlers (thin controllers)
 │   │   ├── __init__.py
-│   │   ├── connection.py    # connect/disconnect
-│   │   ├── questions.py     # ask_question, interrupt
-│   │   ├── voice.py         # voice_start, voice_complete
-│   │   └── playback.py      # pause, resume
-│   │
-│   ├── controllers/             # opcional: lógica HTTP+Socket común
-│   │   ├── __init__.py
-│   │   └── streaming_controller.py
+│   │   ├── connection.py         # connect/disconnect
+│   │   ├── explanations.py       # ⭐ NUEVO: start_explanation
+│   │   ├── interruptions.py      # ⭐ NUEVO: interrupt_explanation
+│   │   ├── questions.py          # ask_question (preguntas libres)
+│   │   ├── voice.py              # voice_start, voice_complete
+│   │   └── playback.py           # pause, resume
 │   │
 │   ├── services/                # lógica de negocio
 │   │   ├── __init__.py
-│   │   ├── question_service.py
-│   │   ├── ai_service.py
-│   │   ├── streaming_service.py
+│   │   ├── exam_service.py           # ⭐ NUEVO: Lógica de exámenes
+│   │   ├── explanation_service.py    # ⭐ NUEVO: Genera explicaciones
+│   │   ├── question_service.py       # Preguntas libres
+│   │   ├── ai_service.py             # Integración OpenAI
+│   │   ├── streaming_service.py      # Streaming de chunks
 │   │   ├── voice_service.py
 │   │   └── session_service.py
 │   │
 │   ├── repositories/
 │   │   ├── __init__.py
-│   │   ├── question_repo.py
-│   │   ├── ai_answers_repo.py
-│   │   └── session_repo.py      # Redis ops
+│   │   ├── question_repo.py              # Banco de preguntas
+│   │   ├── exam_explanation_repo.py      # ⭐ NUEVO: Explicaciones de examen
+│   │   ├── ai_answers_repo.py            # Preguntas libres
+│   │   └── session_repo.py               # Redis ops
 │   │
 │   ├── models/
 │   │   ├── __init__.py
-│   │   ├── answer.py        # Esquema respuestas
-│   │   ├── session.py       # Esquema sesiones
-│   │   └── voice.py         # Esquema interacciones voz
+│   │   ├── answer.py            # Esquema respuestas
+│   │   ├── explanation.py       # ⭐ NUEVO: Esquema explicaciones
+│   │   ├── session.py           # Esquema sesiones
+│   │   └── voice.py             # Esquema interacciones voz
 │   │
 │   └── utils/
 │       ├── __init__.py
@@ -92,127 +95,263 @@ backend/
 └── README.md
 
 
-3. FLUJO PRINCIPAL DEL SISTEMA
+3. FLUJO UNIFICADO DEL SISTEMA
 -------------------------------
 
-[INICIO]
+⭐ FLUJO COMPLETO: EXAMEN (HTTP) + EXPLICACIÓN (Socket.IO) + INTERRUPCIONES + FOLLOW-UP
+
+[FASE 1: PRESENTACIÓN DE PREGUNTA - HTTP REST]
    |
    v
-[Cliente Web] --WebSocket--> [Flask-SocketIO Server]
-   |                                |
-   v                                v
-[Supabase Auth]              [Session Manager]
-Google OAuth                  (Redis - TTL 30min)
-   |                                |
-   v                                v
-[Usuario Autenticado] --------> [Event Handler]
-                                    |
-                    +---------------+---------------+
-                    |                               |
-                    v                               v
-              [Pregunta Texto]               [Pregunta Voz]
-                    |                               |
-                    v                               v
-            [Normalizar texto]              [Grabar audio]
-            - Lowercase                     - Web Speech API
-            - Quitar acentos                - Límite 60s
-            - Trim espacios                      |
-                    |                            v
-                    v                      [Transcribir]
-            [Generar SHA256]               - A texto español
-                    |                            |
-                    |                            v
-                    +<---------------------------+
-                    |
-                    v
-            [Buscar en DB]
-            Supabase PostgreSQL
-                    |
-        +-----------+-----------+
-        |                       |
-        v                       v
-    [EXISTE]                [NO EXISTE]
-    (<200ms)                    |
-        |                       v
-        |                 [Mostrar "Pensando..."]
-        |                       |
-        |                       v
-        |                 [Generar con OpenAI]
-        |                 - Prompt estructurado
-        |                 - Formato JSON
-        |                 - Max 2000 tokens
-        |                       |
-        |                       v
-        |                 [Guardar en DB]
-        |                       |
-        v                       v
-        +----------->+<---------+
-                     |
-                     v
-              [Iniciar Streaming]
-                     |
-                     v
-              [Enviar metadata]
-              {total_steps, duration}
-                     |
-                     v
-         +----->[LOOP: Por cada paso]
+[Frontend] --HTTP GET--> /api/v1/questions/random?subject=matematicas
+   |                       Headers: {Authorization: Bearer <token>}
+   v
+[Backend: QuestionRepo.get_random_by_subject()]
+   |
+   v
+[Response 200 OK]
+{
+  "question_id": "uuid",
+  "question": "¿Cuál es la derivada de x²?",
+  "options": {"a": "2x", "b": "x", "c": "2", "d": "x²"},
+  "subject": "calculo",
+  "difficulty": "medium",
+  "use_latex": true
+}
+   |
+   v
+[Usuario responde en Frontend]
+   |
+   v
+[Frontend] --HTTP POST--> /api/v1/questions/{question_id}/answer
+   |                        Body: {"user_answer": "b"}
+   |                        Headers: {Authorization: Bearer <token>}
+   v
+[Backend: Validar respuesta]
+   |
+   +--------+--------+
+   |                 |
+   v                 v
+[CORRECTA]      [INCORRECTA]
+   |                 |
+   v                 v
+[Response 200]    [Response 200]
+{                 {
+  "correct": true,  "correct": false,
+  "message": "¡Correcto!"  "correct_answer": "a",
+}                   "message": "Incorrecto"
+   |               }
+   v                 |
+[Frontend solicita]  v
+[siguiente pregunta] [Frontend muestra botón "Explicar"]
+   |                 |
+   v                 v
+[Volver a FASE 1]  [Usuario hace clic en "Explicar"]
+                       |
+                       v
+              [FASE 2: EXPLICACIÓN PRINCIPAL - Socket.IO]
+
+[FASE 2: EXPLICACIÓN PRINCIPAL - Socket.IO STREAMING]
+   |
+   v
+[Frontend establece conexión Socket.IO]
+   |  (solo cuando usuario solicita explicación)
+   v
+[Frontend] --Socket.IO--> connect
+   |                       {auth: {token: "jwt"}}
+   v
+[Backend: Validar token y crear sesión Redis]
+   |
+   v
+[Emit: connection_established]
+{session_id: "uuid", user_info: {...}}
+   |
+   v
+[Frontend] --Socket.IO--> start_explanation
+   |                       {question_id: "uuid"}
+   v
+[Backend: ExamService.get_or_create_explanation()]
+   |
+   +---> [1. Buscar pregunta en questions por ID]
+   |          |
+   |          v
+   |     [Pregunta encontrada]
+   |     {question, options, correct_answer, subject}
+   |          |
+   |          v
+   +---> [2. Buscar en exam_question_explanations]
+   |          |
+   |     +----+----+
+   |     |         |
+   |     v         v
+   | [EXISTE]  [NO EXISTE]
+   |     |         |
+   |     |         v
+   |     |    [3. Generar con IA]
+   |     |         |
+   |     |         v
+   |     |    [AIService.generate_answer()]
+   |     |    - Prompt: get_exam_question_prompt()
+   |     |    - Incluye: subject, opciones, respuesta correcta
+   |     |    - OpenAI API - JSON estructurado
+   |     |         |
+   |     |         v
+   |     |    [4. Guardar en exam_question_explanations]
+   |     |    - quality_score: 0.00
+   |     |    - generated_by: 'ai'
+   |     |    - prompt_version: 'v1.0'
+   |     |         |
+   |     v         v
+   |     +----+----+
+   |          |
+   |          v
+   +---> [5. Incrementar usage_count]
+              |
+              v
+       [StreamingService.start_streaming()]
+              |
+              v
+       [Emit: explanation_start]
+       {total_steps, duration, question_id}
+              |
+              v
+       [FASE 3: STREAMING CON INTERRUPCIONES]
+
+
+[FASE 3: STREAMING CON INTERRUPCIONES]
+              |
+              v
+         +----->[LOOP: Por cada paso de la explicación]
          |           |
          |           v
-         |      [step_start]
-         |      - Título
-         |      - Tipo contenido
+         |      [Emit: step_start]
+         |      {step_number, title, content_type}
          |           |
          |           v
-         |      [Chunks de texto]
-         |      - 50-100ms intervalo
-         |      - Typewriter effect
+         |      [Emit: content_chunk] (múltiples)
+         |      - Intervalo 50-100ms
+         |      - Efecto typewriter en Frontend
          |           |
          |           v
-         |      [Comandos canvas]
-         |      - Figuras básicas
-         |      - Animaciones
+         |      [Emit: canvas_command] (si aplica)
+         |      - Dibujar figuras geométricas
+         |      - Gráficas, ecuaciones
+         |      - Animaciones paso a paso
          |           |
          |           v
-         |      ¿Interrupción?
+         |      ¿Usuario interrumpe? (interrupt_explanation)
          |       SI / NO
          |       |     |
          |       v     |
-         |   [PAUSAR]  |
+         |   [PAUSAR STREAMING]  |
          |      |      |
          |      v      |
-         |   [Procesar |
-         |   pregunta] |
+         |   [Frontend] --Socket.IO--> interrupt_explanation |
+         |   {clarification_question: "qué es X?", |
+         |    current_context: "paso 2 de derivadas"} |
          |      |      |
          |      v      |
-         |   [Mini     |
-         |   respuesta]|
+         |   [Backend: AIService.generate_answer()] |
+         |   - Prompt: get_clarification_prompt() |
+         |   - Contexto: pregunta original + paso actual |
+         |   - Respuesta CORTA (1-2 pasos) |
+         |   - NO SE GUARDA EN DB |
+         |      |      |
+         |      v      |
+         |   [Emit: clarification_start] |
+         |   {is_brief: true, estimated_duration: 15} |
+         |      |      |
+         |      v      |
+         |   [Streaming de aclaración] |
+         |   - Más rápido (30ms chunks) |
+         |   - Sin canvas (solo texto) |
+         |      |      |
+         |      v      |
+         |   [Emit: clarification_complete] |
          |      |      |
          |      v      v
-         |   [¿Continuar?]
-         |    SI / NO
-         |    |     |
-         |    v     v
-         |    |   [Nueva pregunta]
-         |    |
-         |    v
-         +---[step_complete]
+         |   [REANUDAR STREAMING PRINCIPAL]
+         |   - Continuar desde donde se quedó
+         |           |
+         |           v
+         +---[Emit: step_complete]
                      |
                      v
               ¿Más pasos?
                SI / NO
                |     |
-               |     v
-               |  [explanation_complete]
-               |     |
-               |     v
-               |  [Solicitar feedback]
-               |     |
-               |     v
-               |  [FIN]
+               +<----+
                |
                v
-            [Siguiente paso]
+         [Emit: explanation_complete]
+         {total_duration, steps_completed}
+               |
+               v
+         [FASE 4: PREGUNTAS ADICIONALES]
+
+
+[FASE 4: PREGUNTAS ADICIONALES (OPCIONALES)]
+   |
+   v
+[¿Usuario tiene más dudas?]
+   SI / NO
+   |     |
+   |     v
+   |   [Solicitar feedback]
+   |   - ¿Fue útil? (helpful_votes)
+   |   - ¿Hubo errores? (flag)
+   |        |
+   |        v
+   |     [FIN - Siguiente pregunta de examen]
+   |
+   v
+[Frontend] --Socket.IO--> ask_follow_up_question
+   |                       {question: "explica más sobre X",
+   |                        related_to: question_id}
+   v
+[Backend: AIService.generate_answer()]
+   |
+   +---> [Normalizar y generar hash]
+   |          |
+   |          v
+   |     [Buscar en ai_answers]
+   |          |
+   |     +----+----+
+   |     |         |
+   |     v         v
+   | [EXISTE]  [NO EXISTE]
+   |     |         |
+   |     |         v
+   |     |    [Generar con IA]
+   |     |    - Prompt: get_follow_up_prompt()
+   |     |    - Contexto: pregunta de examen + explicación previa
+   |     |    - Respuesta LARGA (3-5 pasos)
+   |     |         |
+   |     |         v
+   |     |    [Guardar en ai_answers]
+   |     |         |
+   |     v         v
+   |     +----+----+
+   |          |
+   |          v
+   +---> [StreamingService.start_streaming()]
+              |
+              v
+       [Emit: follow_up_start]
+       {total_steps, duration, is_follow_up: true}
+              |
+              v
+       [Streaming completo (igual que FASE 3)]
+       - Puede tener interrupciones también
+       - Puede tener canvas
+              |
+              v
+       [Emit: follow_up_complete]
+              |
+              v
+       [¿Más preguntas adicionales?]
+        SI: Volver a FASE 4
+        NO: Solicitar feedback y FIN
 
 4. ESQUEMAS DE BASE DE DATOS (SUPABASE)
 ----------------------------------------
@@ -280,14 +419,17 @@ CREATE TABLE questions (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Respuestas IA precalculadas
+-- Respuestas IA precalculadas (para preguntas adicionales/follow-up)
 CREATE TABLE ai_answers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     question_hash TEXT UNIQUE NOT NULL, -- SHA256 de la pregunta normalizada
     question_text TEXT NOT NULL,
     
+    -- Relación opcional con pregunta de examen
+    related_question_id UUID REFERENCES questions(id), -- NULL si es pregunta libre
+    
     -- Respuesta estructurada
-    answer_steps JSONB NOT NULL, -- Array de pasos de explicación
+    answer_steps JSONB NOT NULL, -- Array de pasos de explicación COMPLETA (3-5 pasos)
     total_duration INTEGER DEFAULT 60, -- segundos estimados
     
     -- Estadísticas
