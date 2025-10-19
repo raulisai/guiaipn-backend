@@ -72,27 +72,57 @@ def submit_answer(current_user, question_id):
 def list_questions():
     """
     Lista preguntas del banco (paginado)
+    
+    Query params:
+        - page: int (optional) - Página actual (default: 1)
+        - limit: int (optional) - Resultados por página (default: 20)
+        - subject: string (optional) - Filtrar por materia
     """
     try:
-        # TODO: Implementar con repository
+        from app.repositories.question_repo import QuestionRepository
+        
+        page = int(request.args.get("page", 1))
+        limit = int(request.args.get("limit", 20))
+        subject = request.args.get("subject")
+        
+        question_repo = QuestionRepository()
+        
+        if subject:
+            questions = question_repo.get_by_subject(subject, limit)
+            total = len(questions)
+        else:
+            offset = (page - 1) * limit
+            questions = question_repo.get_all(limit, offset)
+            total = len(questions)  # En producción, hacer count() separado
+        
         return jsonify({
-            "questions": [],
-            "total": 0,
-            "page": 1
+            "questions": questions,
+            "total": total,
+            "page": page,
+            "limit": limit
         }), 200
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error listando preguntas: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
 
 
 @bp.route("/<question_id>", methods=["GET"])
 def get_question(question_id):
     """
-    Obtiene una pregunta específica
+    Obtiene una pregunta específica por ID
     """
     try:
-        # TODO: Implementar con repository
-        return jsonify({"message": "Not implemented"}), 501
+        from app.repositories.question_repo import QuestionRepository
+        
+        question_repo = QuestionRepository()
+        question = question_repo.get_by_id(question_id)
+        
+        if not question:
+            return jsonify({"error": "Pregunta no encontrada"}), 404
+        
+        return jsonify(question), 200
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error obteniendo pregunta: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500

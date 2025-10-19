@@ -85,15 +85,20 @@ jobs:
         pip install -r requirements.txt
     
     - name: Create .env file for tests
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         cat > .env << EOF
         FLASK_ENV=testing
         SECRET_KEY=test-secret-key-for-ci
         REDIS_URL=redis://localhost:6379/0
-        SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-        SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-        SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
-        OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+        SUPABASE_URL=${SUPABASE_URL}
+        SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+        SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+        OPENAI_API_KEY=${OPENAI_API_KEY}
         DATABASE_URL=postgresql://guiaipn_test:test_password@localhost:5432/guiaipn_test
         EOF
     
