@@ -33,7 +33,11 @@ def init_extensions(app, socketio: SocketIO):
     # Redis
     redis_client = redis.from_url(
         Config.REDIS_URL,
-        decode_responses=True
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=5,
+        retry_on_timeout=True,
+        health_check_interval=30
     )
     
     # Supabase
@@ -55,8 +59,9 @@ def init_extensions(app, socketio: SocketIO):
     try:
         redis_client.ping()
         print("✓ Redis conectado")
-    except Exception as e:
+    except redis.exceptions.ConnectionError as e:
         print(f"✗ Error conectando a Redis: {e}")
+        raise RuntimeError(f"No se pudo conectar a Redis: {e}")
     
     print("✓ Supabase inicializado")
     print("✓ SocketIO inicializado")
