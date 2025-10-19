@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  # Redis para cache y sesiones
+  redis:
+    image: redis:7-alpine
+    container_name: guiaipn-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  redis-data:

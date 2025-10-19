@@ -5,12 +5,17 @@ Flask-CORS==4.0.0
 python-socketio==5.10.0
 
 # Database & Cache
-supabase==2.3.0
+supabase==2.10.0
 psycopg[binary]==3.1.16
 redis==5.0.1
+websockets>=13.0
 
 # Environment & Config
 python-dotenv==1.0.0
+
+# ASGI Server
+uvicorn[standard]
+aioredis
 
 # OpenAI
 openai==1.6.1

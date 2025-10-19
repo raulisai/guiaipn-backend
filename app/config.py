@@ -20,8 +20,8 @@ class Config:
     PORT = int(os.getenv("PORT", 5000))
     
     # Supabase
-    SUPABASE_URL = os.getenv("SUPABASE_URL")
-    SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+    SUPABASE_URL = os.getenv("PUBLIC_SUPABASE_URL")
+    SUPABASE_ANON_KEY = os.getenv("PUBLIC_SUPABASE_ANON_KEY")
     SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
     
     # Redis
@@ -46,8 +46,8 @@ class Config:
     def validate():
         """Valida que las variables críticas estén configuradas"""
         required = [
-            "SUPABASE_URL",
-            "SUPABASE_ANON_KEY",
+            "PUBLIC_SUPABASE_URL",
+            "PUBLIC_SUPABASE_ANON_KEY",
             "OPENAI_API_KEY"
         ]
         missing = [var for var in required if not os.getenv(var)]
