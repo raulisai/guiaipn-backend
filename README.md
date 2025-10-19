@@ -19,10 +19,14 @@ backend/
 │   ├── config.py                # Configuración
 │   ├── extensions.py            # Inicialización de extensiones
 │   │
-│   ├── api/v1/                  # API REST
-│   │   ├── auth_routes.py
-│   │   ├── question_routes.py
-│   │   └── session_routes.py
+│   ├── api/                     # API REST
+│   │   ├── openapi.yaml         # Especificación OpenAPI
+│   │   ├── swagger.py           # Configuración Swagger UI
+│   │   ├── README.md            # Documentación de la API
+│   │   └── v1/                  # Versión 1
+│   │       ├── auth_routes.py
+│   │       ├── question_routes.py
+│   │       └── session_routes.py
 │   │
 │   ├── auth/                    # Autenticación
 │   │   ├── supabase.py
@@ -150,6 +154,14 @@ redis-server
 # Ejecutar aplicación
 python run.py
 ```
+
+## Documentación de la API
+
+La API cuenta con documentación interactiva mediante Swagger UI.
+
+**Acceso**: `http://localhost:5000/api/docs`
+
+Ver [documentación completa de la API](app/api/README.md) para más detalles.
 
 ## Endpoints Principales
 

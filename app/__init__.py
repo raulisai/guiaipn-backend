@@ -27,6 +27,10 @@ def create_app():
     app.register_blueprint(question_routes.bp)
     app.register_blueprint(session_routes.bp)
     
+    # Inicializar Swagger UI
+    from app.api.swagger import init_swagger
+    init_swagger(app)
+    
     # Registrar event handlers de SocketIO
     from app.socket_events import connection, questions, voice, playback
     

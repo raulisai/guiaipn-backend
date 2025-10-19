@@ -1,0 +1,437 @@
+openapi: 3.0.3
+info:
+  title: GuiaIPN API
+  description: |
+    API REST para el sistema GuiaIPN - Plataforma de estudio interactivo con IA.
+    
+    ## Autenticación
+    La mayoría de los endpoints requieren autenticación mediante token JWT de Supabase.
+    Incluye el token en el header: `Authorization: Bearer <token>`
+    
+  version: 1.0.0
+  contact:
+    name: GuiaIPN Team
+    
+servers:
+  - url: http://localhost:5000
+    description: Servidor de desarrollo local
+  - url: https://api.guiaipn.com
+    description: Servidor de producción
+
+tags:
+  - name: auth
+    description: Endpoints de autenticación y gestión de usuarios
+  - name: questions
+    description: Gestión del banco de preguntas
+  - name: sessions
+    description: Sesiones de estudio del usuario
+  - name: health
+    description: Health checks del servicio
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT de Supabase
+      
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Mensaje de error
+      required:
+        - error
+        
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID único del usuario
+        email:
+          type: string
+          format: email
+          description: Email del usuario
+        aud:
+          type: string
+          description: Audiencia del token
+        role:
+          type: string
+          description: Rol del usuario
+        
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          
+    VerifyTokenRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: Token JWT de Supabase a verificar
+          
+    VerifyTokenResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        profile:
+          $ref: '#/components/schemas/UserProfile'
+          
+    Question:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          description: Contenido de la pregunta
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        category:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          
+    QuestionList:
+      type: object
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+        total:
+          type: integer
+          description: Total de preguntas disponibles
+        page:
+          type: integer
+          description: Página actual
+          
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [active, completed, paused]
+          
+    SessionList:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+        total:
+          type: integer
+          description: Total de sesiones
+          
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: guiaipn-backend
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Verifica el estado del servicio
+      tags:
+        - health
+      responses:
+        '200':
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+                
+  /api/v1/auth/verify:
+    post:
+      summary: Verificar token
+      description: Verifica un token JWT de Supabase y retorna información del usuario
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyTokenRequest'
+            example:
+              token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Token válido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyTokenResponse'
+        '400':
+          description: Token no proporcionado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Token requerido"
+        '401':
+          description: Token inválido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Token inválido"
+                
+  /api/v1/auth/profile:
+    get:
+      summary: Obtener perfil del usuario
+      description: Retorna el perfil del usuario autenticado
+      tags:
+        - auth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Perfil no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Perfil no encontrado"
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/questions/:
+    get:
+      summary: Listar preguntas
+      description: Obtiene una lista paginada de preguntas del banco
+      tags:
+        - questions
+      parameters:
+        - name: page
+          in: query
+          description: Número de página
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Cantidad de resultados por página
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: category
+          in: query
+          description: Filtrar por categoría
+          schema:
+            type: string
+        - name: difficulty
+          in: query
+          description: Filtrar por dificultad
+          schema:
+            type: string
+            enum: [easy, medium, hard]
+      responses:
+        '200':
+          description: Lista de preguntas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionList'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/questions/{question_id}:
+    get:
+      summary: Obtener pregunta específica
+      description: Retorna los detalles de una pregunta por su ID
+      tags:
+        - questions
+      parameters:
+        - name: question_id
+          in: path
+          required: true
+          description: ID de la pregunta
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalles de la pregunta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: Pregunta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '501':
+          description: No implementado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Not implemented"
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/sessions/:
+    get:
+      summary: Listar sesiones del usuario
+      description: Obtiene todas las sesiones de estudio del usuario autenticado
+      tags:
+        - sessions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de sesiones
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionList'
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /api/v1/sessions/{session_id}:
+    get:
+      summary: Obtener sesión específica
+      description: Retorna los detalles de una sesión por su ID
+      tags:
+        - sessions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          description: ID de la sesión
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalles de la sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Sesión no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '501':
+          description: No implementado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Not implemented"
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
