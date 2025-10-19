@@ -60,8 +60,11 @@ CREATE TABLE questions (
     correct_answer TEXT NOT NULL,
     explanation TEXT,
     
-    -- Configuración LaTeX
-    use_latex BOOLEAN DEFAULT FALSE,
+    -- Configuración de visualización
+    use_latex BOOLEAN DEFAULT FALSE, -- (deprecated) usar leng_math_pregunta y leng_math_opciones
+    img_active BOOLEAN DEFAULT FALSE, -- Indica si tiene imagen asociada
+    leng_math_pregunta BOOLEAN DEFAULT FALSE, -- Pregunta usa LaTeX
+    leng_math_opciones BOOLEAN DEFAULT FALSE, -- Opciones usan LaTeX
     
     -- Estadísticas
     times_seen INTEGER DEFAULT 0,
@@ -283,6 +286,8 @@ CREATE TABLE canvas_library (
 CREATE INDEX idx_profiles_user ON profiles(id);
 CREATE INDEX idx_questions_subject ON questions(subject, difficulty);
 CREATE INDEX idx_questions_code ON questions(code);
+CREATE INDEX idx_questions_img_active ON questions(img_active) WHERE img_active = TRUE;
+CREATE INDEX idx_questions_latex ON questions(leng_math_pregunta, leng_math_opciones) WHERE leng_math_pregunta = TRUE OR leng_math_opciones = TRUE;
 CREATE INDEX idx_ai_answers_hash ON ai_answers(question_hash);
 CREATE INDEX idx_ai_answers_related_question ON ai_answers(related_question_id);
 CREATE INDEX idx_interactions_user ON interactions(user_id, created_at DESC);

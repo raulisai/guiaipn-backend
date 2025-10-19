@@ -144,15 +144,75 @@ components:
         id:
           type: string
           format: uuid
-        content:
+        code:
           type: string
-          description: Contenido de la pregunta
+          description: Código único de la pregunta
+          example: "2024MAT01"
+        subject:
+          type: string
+          description: Materia de la pregunta
+          example: "matematicas"
+        topic:
+          type: string
+          description: Tema específico
+          example: "algebra"
         difficulty:
           type: string
           enum: [easy, medium, hard]
-        category:
+          description: Nivel de dificultad
+        question:
           type: string
+          description: Texto de la pregunta
+        options:
+          type: object
+          description: Opciones de respuesta (a, b, c, d)
+          example:
+            a: "Opción A"
+            b: "Opción B"
+            c: "Opción C"
+            d: "Opción D"
+        correct_answer:
+          type: string
+          description: Respuesta correcta (a, b, c, o d)
+          example: "b"
+        explanation:
+          type: string
+          description: Explicación de la respuesta
+        use_latex:
+          type: boolean
+          description: (Deprecated) Si usa LaTeX
+          deprecated: true
+        img_active:
+          type: boolean
+          description: Indica si tiene imagen asociada
+          default: false
+        leng_math_pregunta:
+          type: boolean
+          description: Indica si la pregunta usa LaTeX
+          default: false
+        leng_math_opciones:
+          type: boolean
+          description: Indica si las opciones usan LaTeX
+          default: false
+        times_seen:
+          type: integer
+          description: Veces que se ha mostrado
+        times_correct:
+          type: integer
+          description: Veces respondida correctamente
+        exam_probability:
+          type: number
+          format: float
+          description: Probabilidad de aparecer en examen (0.0 a 1.0)
+        tags:
+          type: array
+          items:
+            type: string
+          description: Etiquetas de la pregunta
         created_at:
+          type: string
+          format: date-time
+        updated_at:
           type: string
           format: date-time
           
