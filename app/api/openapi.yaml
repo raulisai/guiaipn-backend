@@ -79,12 +79,47 @@ components:
         avatar_url:
           type: string
           nullable: true
+        plan_type:
+          type: string
+          enum: [free, basic, premium, pro]
+          default: free
+        credits_remaining:
+          type: integer
+          default: 10
+        credits_total:
+          type: integer
+          default: 10
+        daily_limit:
+          type: integer
+          default: 5
+        daily_used:
+          type: integer
+          default: 0
+        preferred_language:
+          type: string
+          default: es
+        learning_level:
+          type: string
+          default: medium
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+          
+    InitializeProfileResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Perfil inicializado exitosamente"
+        profile:
+          $ref: '#/components/schemas/UserProfile'
+        progress_initialized:
+          type: integer
+          description: Número de materias inicializadas
+          example: 8
           
     VerifyTokenRequest:
       type: object
@@ -264,6 +299,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+                
+  /api/v1/auth/initialize:
+    post:
+      summary: Inicializar perfil de nuevo usuario
+      description: |
+        Crea el perfil inicial de un usuario después del registro con Google OAuth.
+        Este endpoint debe llamarse una vez después de que el usuario se registre exitosamente.
+        
+        **Crea automáticamente:**
+        - Perfil en la tabla `profiles` con valores por defecto
+        - Progreso inicial en `user_progress` para 8 materias principales
+        
+        **Valores por defecto:**
+        - Plan: free
+        - Créditos: 10
+        - Límite diario: 5
+        - Idioma: español
+        - Nivel: medio
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyTokenRequest'
+            example:
+              token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: El perfil ya existe
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "El perfil ya existe"
+                  profile:
+                    $ref: '#/components/schemas/UserProfile'
+        '201':
+          description: Perfil creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitializeProfileResponse'
+        '400':
+          description: Token no proporcionado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Token requerido"
+        '500':
+          description: Error al crear el perfil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Error creando perfil: ..."
                 
   /api/v1/questions/:
     get:
