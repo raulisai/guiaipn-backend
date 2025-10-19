@@ -216,9 +216,7 @@ CREATE TABLE user_subscriptions (
     ends_at TIMESTAMPTZ,
     
     -- Pago
-    stripe_subscription_id TEXT,
-    
-    UNIQUE(user_id) WHERE status = 'active'
+    stripe_subscription_id TEXT
 );
 
 -- Biblioteca de comandos de canvas (para visualizaciones)
@@ -255,6 +253,9 @@ CREATE INDEX idx_credit_usage_user ON credit_usage(user_id, created_at DESC);
 -- Índices para búsqueda de texto
 CREATE INDEX idx_questions_search ON questions USING gin(to_tsvector('spanish', question));
 CREATE INDEX idx_ai_answers_search ON ai_answers USING gin(to_tsvector('spanish', question_text));
+
+-- Índice único parcial para garantizar solo una suscripción activa por usuario
+CREATE UNIQUE INDEX idx_user_subscriptions_active_unique ON user_subscriptions(user_id) WHERE status = 'active';
 
 -- =========================================
 -- 4. FUNCIONES AUXILIARES
