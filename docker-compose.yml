@@ -1,42 +1,181 @@
 version: '3.8'
 
+# GuiaIPN Backend - Docker Compose Configuration
+# Services: backend, redis, postgres, traefik (optional)
+
 services:
+  # ============================================
   # Backend Flask + SocketIO
+  # ============================================
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: guiaipn-backend
     ports:
-      - "5000:5000"
+      - "${BACKEND_PORT:-5000}:5000"
     environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=True
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - FLASK_DEBUG=${FLASK_DEBUG:-False}
       - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-guiaipn}:${POSTGRES_PASSWORD:-guiaipn_password}@postgres:5432/${POSTGRES_DB:-guiaipn}
     env_file:
       - .env
     volumes:
+      # Solo en desarrollo - comentar en producción
       - .:/app
+      - ./logs:/app/logs
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - guiaipn-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.guiaipn.local`)"
+      - "traefik.http.services.backend.loadbalancer.server.port=5000"
 
-  # Redis para cache y sesiones
+  # ============================================
+  # Redis - Cache y Sesiones
+  # ============================================
   redis:
     image: redis:7-alpine
     container_name: guiaipn-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - guiaipn-network
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server /usr/local/etc/redis/redis.conf --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    sysctls:
+      - net.core.somaxconn=511
 
+  # ============================================
+  # PostgreSQL - Base de Datos Principal
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: guiaipn-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-guiaipn}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-guiaipn_password}
+      - POSTGRES_DB=${POSTGRES_DB:-guiaipn}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - guiaipn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-guiaipn}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    shm_size: 256mb
+
+  # ============================================
+  # Traefik - Reverse Proxy (Opcional)
+  # ============================================
+  traefik:
+    image: traefik:v2.10
+    container_name: guiaipn-traefik
+    profiles:
+      - with-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/certificates:/certificates
+    networks:
+      - guiaipn-network
+    restart: unless-stopped
+
+  # ============================================
+  # PgAdmin - Administración de PostgreSQL (Opcional)
+  # ============================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: guiaipn-pgadmin
+    profiles:
+      - with-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@guiaipn.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - guiaipn-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  # ============================================
+  # Redis Commander - Administración de Redis (Opcional)
+  # ============================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: guiaipn-redis-commander
+    profiles:
+      - with-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
+    networks:
+      - guiaipn-network
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+# ============================================
+# Networks
+# ============================================
 networks:
   guiaipn-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
 
+# ============================================
+# Volumes
+# ============================================
 volumes:
   redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  pgadmin-data:
+    driver: local
