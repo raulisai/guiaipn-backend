@@ -6,6 +6,7 @@ ARQUITECTURA BACKEND - SISTEMA DE APRENDIZAJE INMERSIVO
 Frontend: Svelte + Socket.IO Client
 Backend: Flask + Flask-SocketIO
 Base de Datos: Supabase (PostgreSQL)
+Documentacion: Swagger
 Cache: Redis
 Auth: Supabase Auth (Google OAuth)
 IA: OpenAI API
@@ -15,35 +16,47 @@ Transcripción: Web Speech API (MVP)
 -------------------------
 backend/
 ├── app/
-│   ├── __init__.py          # Flask app factory
-│   ├── config.py            # Configuraciones
-│   ├── extensions.py        # Inicializar extensiones
+│   ├── __init__.py              # app factory (Flask + SocketIO)
+│   ├── config.py
+│   ├── extensions.py            # db, redis, socketio, swagger
+│   │
+│   ├── api/                     # HTTP API (Blueprints = controllers)
+│   │   ├── __init__.py
+│   │   ├── v1/
+│   │   │   ├── __init__.py
+│   │   │   ├── auth_routes.py       # /api/v1/auth
+│   │   │   ├── question_routes.py   # /api/v1/questions
+│   │   │   └── session_routes.py
 │   │
 │   ├── auth/
 │   │   ├── __init__.py
 │   │   ├── decorators.py    # @require_auth
 │   │   └── supabase.py      # Cliente Supabase
 │   │
-│   ├── socket_events/
+│   ├── socket_events/    # SocketIO handlers (thin controllers)
 │   │   ├── __init__.py
 │   │   ├── connection.py    # connect/disconnect
 │   │   ├── questions.py     # ask_question, interrupt
 │   │   ├── voice.py         # voice_start, voice_complete
 │   │   └── playback.py      # pause, resume
 │   │
-│   ├── services/
+│   ├── controllers/             # opcional: lógica HTTP+Socket común
 │   │   ├── __init__.py
-│   │   ├── question_service.py    # Lógica de preguntas
-│   │   ├── streaming_service.py   # Control de streaming
-│   │   ├── ai_service.py          # OpenAI integration
-│   │   ├── voice_service.py       # Transcripción
-│   │   └── session_service.py     # Gestión de sesiones
+│   │   └── streaming_controller.py
+│   │
+│   ├── services/                # lógica de negocio
+│   │   ├── __init__.py
+│   │   ├── question_service.py
+│   │   ├── ai_service.py
+│   │   ├── streaming_service.py
+│   │   ├── voice_service.py
+│   │   └── session_service.py
 │   │
 │   ├── repositories/
 │   │   ├── __init__.py
-│   │   ├── answer_repository.py   # CRUD respuestas
-│   │   ├── session_repository.py  # Redis operations
-│   │   └── voice_repository.py    # Historial voz
+│   │   ├── question_repo.py
+│   │   ├── ai_answers_repo.py
+│   │   └── session_repo.py      # Redis ops
 │   │
 │   ├── models/
 │   │   ├── __init__.py
@@ -62,16 +75,22 @@ backend/
 │   ├── 001_create_tables.sql
 │   ├── 002_add_indexes.sql
 │   └── 003_seed_data.sql
-│
 ├── tests/
 │   ├── unit/
 │   ├── integration/
 │   └── conftest.py
-│
-├── requirements.txt
+├── .env
 ├── .env.example
-├── run.py                   # Entry point
+├── .gitignore
+├── .pre-commit-config.yaml
+├── .python-version
+├── .vscode/
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── run.py
 └── README.md
+
 
 3. FLUJO PRINCIPAL DEL SISTEMA
 -------------------------------
@@ -198,72 +217,230 @@ Google OAuth                  (Redis - TTL 30min)
 4. ESQUEMAS DE BASE DE DATOS (SUPABASE)
 ----------------------------------------
 
--- Tabla: predefined_answers
-CREATE TABLE predefined_answers (
+-- Habilitar extensiones necesarias
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- Para búsquedas de texto
+CREATE EXTENSION IF NOT EXISTS "unaccent"; -- Para normalizar texto
+
+-- =========================================
+-- 2. TABLAS CORE DEL SISTEMA
+-- =========================================
+
+-- Perfiles de usuario (extiende auth.users de Supabase)
+CREATE TABLE profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT UNIQUE,
+    full_name TEXT,
+    avatar_url TEXT,
+    
+    -- Plan y créditos
+    plan_type TEXT DEFAULT 'free' CHECK (plan_type IN ('free', 'basic', 'premium', 'pro')),
+    credits_remaining INTEGER DEFAULT 10,
+    credits_total INTEGER DEFAULT 10,
+    daily_limit INTEGER DEFAULT 5,
+    daily_used INTEGER DEFAULT 0,
+    last_reset_date DATE DEFAULT CURRENT_DATE,
+    
+    -- Configuración
+    preferred_language TEXT DEFAULT 'es',
+    learning_level TEXT DEFAULT 'medium',
+    
+    -- Metadata
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Banco de preguntas del examen
+CREATE TABLE questions (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    question_hash VARCHAR(64) UNIQUE NOT NULL,
-    question_original TEXT NOT NULL,
-    category VARCHAR(50),
-    difficulty VARCHAR(20) CHECK (difficulty IN ('easy', 'medium', 'hard')),
-    steps JSONB NOT NULL,
-    total_duration INTEGER DEFAULT 0,
+    
+    -- Identificación
+    code TEXT UNIQUE NOT NULL, -- ej: "2024Algebra14"
+    subject TEXT NOT NULL, -- algebra, calculo, fisica, etc
+    topic TEXT,
+    difficulty TEXT DEFAULT 'medium' CHECK (difficulty IN ('easy', 'medium', 'hard')),
+    
+    -- Contenido
+    question TEXT NOT NULL,
+    options JSONB NOT NULL, -- {a: "...", b: "...", c: "...", d: "..."}
+    correct_answer TEXT NOT NULL,
+    explanation TEXT,
+    
+    -- Configuración LaTeX
+    use_latex BOOLEAN DEFAULT FALSE,
+    
+    -- Estadísticas
+    times_seen INTEGER DEFAULT 0,
+    times_correct INTEGER DEFAULT 0,
+    exam_probability NUMERIC(3,2) DEFAULT 0.50, -- 0.00 a 1.00
+    
+    -- Metadata
+    tags TEXT[] DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Respuestas IA precalculadas
+CREATE TABLE ai_answers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    question_hash TEXT UNIQUE NOT NULL, -- SHA256 de la pregunta normalizada
+    question_text TEXT NOT NULL,
+    
+    -- Respuesta estructurada
+    answer_steps JSONB NOT NULL, -- Array de pasos de explicación
+    total_duration INTEGER DEFAULT 60, -- segundos estimados
+    
+    -- Estadísticas
     usage_count INTEGER DEFAULT 0,
+    helpful_votes INTEGER DEFAULT 0,
+    total_votes INTEGER DEFAULT 0,
+    
+    -- Metadata
+    generated_by TEXT DEFAULT 'manual', -- manual, gpt-3.5, gpt-4
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Historial de interacciones
+CREATE TABLE interactions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    session_id TEXT,
+    
+    -- Pregunta y respuesta
+    question_text TEXT NOT NULL,
+    question_type TEXT DEFAULT 'text', -- text, voice, exam
+    answer_id UUID REFERENCES ai_answers(id),
+    question_id UUID REFERENCES questions(id),
+    
+    -- Métricas
+    response_time_ms INTEGER,
+    credits_used INTEGER DEFAULT 1,
+    completed BOOLEAN DEFAULT TRUE,
+    
+    -- Feedback
+    rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+    understood BOOLEAN,
+    seen_in_exam BOOLEAN DEFAULT FALSE,
+    
+    -- Metadata
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Sesiones de estudio
+CREATE TABLE study_sessions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    
+    -- Información de sesión
+    session_type TEXT DEFAULT 'practice', -- practice, exam, review
+    status TEXT DEFAULT 'active', -- active, completed, abandoned
+    
+    -- Estadísticas
+    questions_asked INTEGER DEFAULT 0,
+    questions_answered INTEGER DEFAULT 0,
+    correct_answers INTEGER DEFAULT 0,
+    total_duration_seconds INTEGER DEFAULT 0,
+    
+    -- Timestamps
+    started_at TIMESTAMPTZ DEFAULT NOW(),
+    ended_at TIMESTAMPTZ,
+    
+    -- Metadata
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- Progreso del usuario
+CREATE TABLE user_progress (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    subject TEXT NOT NULL,
+    
+    -- Métricas
+    total_practiced INTEGER DEFAULT 0,
+    total_correct INTEGER DEFAULT 0,
+    mastery_level NUMERIC(3,2) DEFAULT 0.00, -- 0.00 a 1.00
+    streak_days INTEGER DEFAULT 0,
+    
+    -- Timestamps
+    last_practice_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    created_by VARCHAR(20) DEFAULT 'manual',
-    feedback_score FLOAT DEFAULT 0.0
+    
+    UNIQUE(user_id, subject)
 );
 
--- Índices
-CREATE INDEX idx_question_hash ON predefined_answers(question_hash);
-CREATE INDEX idx_category ON predefined_answers(category, difficulty);
-CREATE INDEX idx_usage ON predefined_answers(usage_count DESC);
-
--- Tabla: voice_interactions
-CREATE TABLE voice_interactions (
+-- Uso de créditos
+CREATE TABLE credit_usage (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id),
-    session_id VARCHAR(36) NOT NULL,
-    audio_url TEXT,
-    transcription TEXT NOT NULL,
-    transcription_method VARCHAR(20),
-    confidence_score FLOAT,
-    processing_time_ms INTEGER,
-    was_confirmed BOOLEAN DEFAULT FALSE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    
+    -- Detalle del uso
+    action_type TEXT NOT NULL, -- ai_question, voice, premium_feature
+    credits_used INTEGER NOT NULL,
+    credits_before INTEGER NOT NULL,
+    credits_after INTEGER NOT NULL,
+    
+    -- Contexto
+    interaction_id UUID REFERENCES interactions(id),
+    details JSONB DEFAULT '{}'::jsonb,
+    
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Tabla: interaction_history
-CREATE TABLE interaction_history (
+-- Planes de suscripción
+CREATE TABLE subscription_plans (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id),
-    session_id VARCHAR(36) NOT NULL,
-    question TEXT NOT NULL,
-    answer_source VARCHAR(20),
-    response_time_ms INTEGER,
-    was_interrupted BOOLEAN DEFAULT FALSE,
-    interruption_count INTEGER DEFAULT 0,
-    feedback_rating INTEGER CHECK (feedback_rating >= 1 AND feedback_rating <= 5),
+    name TEXT UNIQUE NOT NULL,
+    
+    -- Límites
+    monthly_credits INTEGER NOT NULL,
+    daily_limit INTEGER NOT NULL,
+    
+    -- Features
+    features JSONB DEFAULT '{}'::jsonb,
+    
+    -- Precio
+    price_monthly NUMERIC(10,2) DEFAULT 0,
+    price_yearly NUMERIC(10,2) DEFAULT 0,
+    
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- RLS Policies
-ALTER TABLE predefined_answers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE voice_interactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE interaction_history ENABLE ROW LEVEL SECURITY;
+-- Suscripciones de usuarios
+CREATE TABLE user_subscriptions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    plan_id UUID REFERENCES subscription_plans(id),
+    
+    -- Estado
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired', 'trial')),
+    
+    -- Fechas
+    started_at TIMESTAMPTZ DEFAULT NOW(),
+    ends_at TIMESTAMPTZ,
+    
+    -- Pago
+    stripe_subscription_id TEXT
+);
 
--- Políticas de seguridad
-CREATE POLICY "Answers are viewable by everyone" 
-    ON predefined_answers FOR SELECT 
-    USING (true);
+-- Biblioteca de comandos de canvas (para visualizaciones)
+CREATE TABLE canvas_library (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    
+    -- Comandos
+    commands JSONB NOT NULL,
+    
+    -- Metadata
+    tags TEXT[] DEFAULT '{}',
+    usage_count INTEGER DEFAULT 0,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-CREATE POLICY "Voice interactions belong to users" 
-    ON voice_interactions FOR ALL 
-    USING (auth.uid() = user_id);
-
-CREATE POLICY "History belongs to users" 
-    ON interaction_history FOR ALL 
-    USING (auth.uid() = user_id);
 
 5. CONFIGURACIÓN REDIS
 ----------------------
