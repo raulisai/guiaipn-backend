@@ -42,9 +42,21 @@ ENV/
 htmlcov/
 .tox/
 
+# Git
+.git/
+.gitignore
+
+# Documentation
+documentation/
+
 # Logs
 *.log
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
