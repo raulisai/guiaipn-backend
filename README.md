@@ -315,11 +315,29 @@ redis-server
 - Verifica que `OPENAI_API_KEY` sea válido
 - Verifica que tengas créditos disponibles en tu cuenta de OpenAI
 
-## Documentación Adicional
+## 📚 Documentación Completa
 
-- [Arquitectura del Sistema](documentation/architecture/architecture-guiaIpn.md)
-- [Esquema de Base de Datos](documentation/db/schema_complete.sql)
-- [Diagrama de Flujo](documentation/architecture/Diagrama_stream_guiaipn.svg)
+### 📖 Documentación Principal
+- **[Índice de Documentación](documentation/README.md)** - Punto de entrada a toda la documentación
+- **[Resumen Ejecutivo](documentation/RESUMEN_EJECUTIVO.md)** - Vista general del sistema
+
+### 🏗️ Arquitectura y Diseño
+- **[Arquitectura](documentation/ARCHITECTURE.md)** - Stack tecnológico, estructura, patrones de diseño
+- **[Diagramas de Flujo](documentation/FLOW_DIAGRAMS.md)** - Flujos detallados con diagramas visuales
+
+### 🌐 API y Comunicación
+- **[Rutas HTTP](documentation/HTTP_ROUTES.md)** - Documentación completa de API REST
+- **[Socket.IO](documentation/SOCKET_IO_COMPLETE.md)** - Eventos WebSocket, streaming, ejemplos
+- **[Swagger UI](http://localhost:5000/api/docs)** - Documentación interactiva
+
+### 🎨 Implementación Frontend
+- **[Guía Frontend](documentation/FRONTEND_GUIDE.md)** - Guía rápida de implementación
+- **[Referencia de Servicios](documentation/SERVICES_REFERENCE.md)** - API de servicios y repositorios
+
+### 📊 Otros
+- **[Sesiones Redis](documentation/REDIS_SESSIONS.md)** - Gestión de sesiones
+- **[Esquema de Base de Datos](documentation/db/schema_complete.sql)** - SQL completo
+- **[Estado de Implementación](documentation/IMPLEMENTATION_COMPLETE.md)** - Features completadas
 
 ## Contribuir
 
