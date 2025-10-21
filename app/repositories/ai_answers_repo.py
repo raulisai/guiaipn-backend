@@ -31,6 +31,11 @@ class AIAnswersRepository:
             return response.data if response.data else None
             
         except Exception as e:
+            # PGRST116 significa que no hay resultados (caso normal para preguntas nuevas)
+            error_str = str(e)
+            if "PGRST116" in error_str or "0 rows" in error_str:
+                return None
+            # Solo imprimir errores reales
             print(f"Error buscando respuesta: {e}")
             return None
     

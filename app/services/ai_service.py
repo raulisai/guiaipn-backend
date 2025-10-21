@@ -42,7 +42,7 @@ class AIService:
     }
     """
     
-    DEFAULT_MODEL = "gpt-4"
+    DEFAULT_MODEL = "gpt-4-turbo-preview"  # Soporta response_format json_object
     MAX_TOKENS = 3000
     TEMPERATURE = 0.7
     MAX_RETRY_ATTEMPTS = 2

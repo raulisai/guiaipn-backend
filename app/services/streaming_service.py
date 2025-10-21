@@ -59,7 +59,7 @@ class StreamingService:
             self.session_service.update_streaming_state(
                 session_id=session_id,
                 is_streaming=True,
-                step=0
+                current_step=0
             )
             
             # Enviar metadata inicial
@@ -84,7 +84,7 @@ class StreamingService:
                 self.session_service.update_streaming_state(
                     session_id=session_id,
                     is_streaming=True,
-                    step=step_index
+                    current_step=step_index
                 )
                 
                 # Stream del paso
@@ -94,7 +94,7 @@ class StreamingService:
             self.session_service.update_streaming_state(
                 session_id=session_id,
                 is_streaming=False,
-                step=len(steps)
+                current_step=len(steps)
             )
             
             emit("explanation_complete", {
