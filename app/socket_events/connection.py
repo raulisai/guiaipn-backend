@@ -29,12 +29,8 @@ def handle_connect(auth):
         token = auth.get("token") if auth else None
         
         if not token:
-            emit("error", {
-                "code": "AUTH_REQUIRED",
-                "message": "Token de autenticación requerido"
-            })
-            disconnect()
-            return
+            print("✗ Conexión rechazada: Token no proporcionado")
+            return False  # Rechazar conexión sin emitir eventos
         
         # Verificar token
         user = verify_token(token)
@@ -64,11 +60,9 @@ def handle_connect(auth):
         
     except Exception as e:
         print(f"✗ Error en conexión: {e}")
-        emit("error", {
-            "code": "CONNECTION_ERROR",
-            "message": str(e)
-        })
-        disconnect()
+        import traceback
+        traceback.print_exc()
+        return False  # Rechazar conexión en caso de error
 
 
 @socketio.on("disconnect")

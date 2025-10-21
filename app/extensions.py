@@ -26,7 +26,9 @@ def init_extensions(app, socketio: SocketIO):
     CORS(app, resources={
         r"/*": {
             "origins": Config.CORS_ORIGINS,
-            "supports_credentials": True
+            "supports_credentials": True,
+            "allow_headers": ["Content-Type", "Authorization"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
         }
     })
     
@@ -50,9 +52,13 @@ def init_extensions(app, socketio: SocketIO):
     socketio.init_app(
         app,
         cors_allowed_origins=Config.CORS_ORIGINS,
-        async_mode="threading",
+        async_mode="gevent",
         logger=Config.DEBUG,
-        engineio_logger=Config.DEBUG
+        engineio_logger=Config.DEBUG,
+        ping_timeout=60,
+        ping_interval=25,
+        manage_session=False,
+        always_connect=False
     )
     
     # Test connections
