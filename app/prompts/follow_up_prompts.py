@@ -44,11 +44,27 @@ FORMATO DE RESPUESTA (JSON):
     "total_duration": 90
 }
 
-TIPOS DE CANVAS COMMANDS:
-- "draw_equation": Para ecuaciones matemáticas
-- "draw_graph": Para gráficas
-- "draw_diagram": Para diagramas
-- "highlight": Para resaltar partes importantes
+CANVAS COMMANDS - TIPOS SOPORTADOS:
+1. draw_equation, 2. draw_image, 3. draw_graph, 4. draw_diagram, 5. draw_table, 6. highlight
+
+COMPONENT COMMANDS - COMPONENTES INTERACTIVOS SVELTE:
+1. image_modal - Modal con auto_close y duration
+2. pdf_viewer - Visor PDF embebido
+3. interactive_chart - Gráficas interactivas
+4. video_player - Reproductor de video
+5. interactive_3d - Modelos 3D rotables
+6. quiz_component - Mini quizzes
+7. code_editor - Editor de código
+8. timeline_component - Líneas de tiempo
+
+EJEMPLO:
+{
+    "step_number": 1,
+    "canvas_commands": [{"command": "draw_equation", "parameters": {"equation": "x = 3", "description": "Solución"}}],
+    "component_commands": [{"command": "image_modal", "parameters": {"url": "url", "alt": "desc", "title": "título", "auto_close": true, "duration": 5000, "description": "modal"}}]
+}
+
+REGLAS: canvas_commands (visualizaciones estáticas), component_commands (componentes interactivos Svelte). Ambos pueden usarse juntos. auto_close + duration en ms. Siempre "description"
 """
 
     # Contexto de la pregunta original

@@ -262,6 +262,78 @@ flake8 app/ tests/
 }
 ```
 
+## Canvas Commands y Component Commands
+
+El sistema soporta dos tipos de comandos para visualizaciones:
+
+### Canvas Commands (Visualizaciones Estáticas)
+
+Renderizaciones estáticas en el canvas:
+
+1. **draw_equation** - Ecuaciones matemáticas paso a paso
+2. **draw_image** - Imágenes explicativas
+3. **draw_graph** - Gráficas matemáticas
+4. **draw_diagram** - Diagramas conceptuales
+5. **draw_table** - Tablas de datos
+6. **highlight** - Resaltar texto
+
+### Component Commands (Componentes Interactivos Svelte)
+
+Componentes reactivos que pueden cerrarse automáticamente:
+
+1. **image_modal** - Modal de imagen con `auto_close` y `duration`
+2. **pdf_viewer** - Visor de PDF embebido
+3. **interactive_chart** - Gráficas interactivas
+4. **video_player** - Reproductor de video
+5. **interactive_3d** - Modelos 3D rotables
+6. **quiz_component** - Mini quizzes
+7. **code_editor** - Editor de código
+8. **timeline_component** - Líneas de tiempo
+
+### Ejemplo Combinado
+
+```json
+{
+    "step_number": 2,
+    "title": "Visualización molecular",
+    "content": "Observa la estructura del agua.",
+    "has_visual": true,
+    "canvas_commands": [
+        {
+            "command": "draw_equation",
+            "parameters": {
+                "equation": "H2O",
+                "description": "Fórmula química"
+            }
+        }
+    ],
+    "component_commands": [
+        {
+            "command": "image_modal",
+            "parameters": {
+                "url": "https://example.com/h2o.png",
+                "alt": "Estructura del agua",
+                "title": "Molécula de H2O",
+                "auto_close": true,
+                "duration": 5000,
+                "description": "Visualización 2D"
+            }
+        },
+        {
+            "command": "interactive_3d",
+            "parameters": {
+                "model_url": "https://example.com/h2o.glb",
+                "title": "Modelo 3D",
+                "auto_rotate": true,
+                "description": "Modelo interactivo"
+            }
+        }
+    ]
+}
+```
+
+Ver especificación completa en `app/prompts/exam_prompts.py`.
+
 ## Flujo de Autenticación
 
 1. Usuario se autentica con Google en frontend

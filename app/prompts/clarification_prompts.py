@@ -22,7 +22,7 @@ def get_clarification_prompt(
 
 IMPORTANTE:
 - Responde de manera BREVE y DIRECTA (1-2 pasos máximo)
-- No uses canvas commands (solo texto)
+- Usa canvas_commands/component_commands SOLO si es absolutamente necesario
 - Mantén el foco en la duda específica
 - Usa un tono amigable y alentador
 - Después de responder, el estudiante continuará con la explicación principal
@@ -41,6 +41,12 @@ FORMATO DE RESPUESTA (JSON):
     ],
     "total_duration": 15
 }
+
+CANVAS COMMANDS: draw_equation, draw_image, draw_graph, draw_diagram, draw_table, highlight
+COMPONENT COMMANDS: image_modal, pdf_viewer, interactive_chart, video_player, interactive_3d, quiz_component, code_editor, timeline_component
+
+USO LIMITADO: Solo si mejora significativamente la claridad. Máximo 1-2 comandos.
+EJEMPLO: {"canvas_commands": [{"command": "draw_equation", "parameters": {"equation": "x=3", "description": "Solución"}}], "component_commands": null}
 """
 
     # Contexto de la explicación actual
