@@ -57,7 +57,7 @@ EJEMPLO:
 {
     "step_number": 1,
     "canvas_commands": [{"command": "draw_equation", "parameters": {"equation": "x = 3", "description": "Solución"}}],
-    "component_commands": [{"command": "image_modal", "parameters": {"url": "url", "alt": "desc", "title": "título", "auto_close": true, "duration": 5000, "description": "modal"}}]
+    "component_commands": [{"command": "image_component", "parameters": {"url": "url", "alt": "desc", "title": "título", "auto_close": true, "duration": 5000, "description": "modal"}}]
 }
 
 REGLAS: canvas_commands (visualizaciones estáticas), component_commands (componentes interactivos Svelte). Ambos pueden usarse juntos. auto_close + duration en ms. Siempre "description"

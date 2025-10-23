@@ -43,7 +43,7 @@ FORMATO DE RESPUESTA (JSON):
 }
 
 CANVAS COMMANDS: draw_equation, draw_image, draw_graph, draw_diagram, draw_table, highlight
-COMPONENT COMMANDS: image_modal, pdf_viewer, interactive_chart, video_player, interactive_3d, quiz_component, code_editor, timeline_component
+COMPONENT COMMANDS: image_component, pdf_viewer, interactive_chart, video_player, interactive_3d, quiz_component, code_editor, timeline_component
 
 USO LIMITADO: Solo si mejora significativamente la claridad. Máximo 1-2 comandos.
 EJEMPLO: {"canvas_commands": [{"command": "draw_equation", "parameters": {"equation": "x=3", "description": "Solución"}}], "component_commands": null}

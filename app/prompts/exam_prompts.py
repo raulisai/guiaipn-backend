@@ -65,7 +65,7 @@ COMPONENT COMMANDS - COMPONENTES INTERACTIVOS SVELTE:
 Permiten abrir componentes reactivos que son interactivos y pueden cerrarse automáticamente.
 
 1. image_modal - Modal de imagen con cierre automático:
-   {"command": "image_modal", "parameters": {"url": "https://example.com/img.png", "alt": "Descripción", "title": "Título", "auto_close": true, "duration": 5000, "description": "Modal de imagen"}}
+   {"command": "image_component", "parameters": {"url": "https://example.com/img.png", "alt": "Descripción", "title": "Título", "auto_close": true, "duration": 5000, "description": "Modal de imagen"}}
 
 2. pdf_viewer - Visor de PDF embebido:
    {"command": "pdf_viewer", "parameters": {"url": "https://example.com/doc.pdf", "title": "Documento", "page": 1, "auto_close": false, "description": "Visor PDF"}}
@@ -103,7 +103,7 @@ EJEMPLO - Con canvas y component commands:
     "has_visual": true,
     "canvas_commands": [{"command": "draw_equation", "parameters": {"equation": "H2O", "description": "Fórmula"}}],
     "component_commands": [
-        {"command": "image_modal", "parameters": {"url": "https://example.com/h2o.png", "alt": "Agua", "title": "H2O", "auto_close": true, "duration": 5000, "description": "Estructura 2D"}},
+        {"command": "image_component", "parameters": {"url": "https://example.com/h2o.png", "alt": "Agua", "title": "H2O", "auto_close": true, "duration": 5000, "description": "Estructura 2D"}},
         {"command": "interactive_3d", "parameters": {"model_url": "https://example.com/h2o.glb", "title": "Modelo 3D", "auto_rotate": true, "description": "Modelo interactivo"}}
     ]
 }
