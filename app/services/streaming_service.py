@@ -122,6 +122,7 @@ class StreamingService:
         content = step.get("content", "")
         step_type = step.get("type", "text")
         canvas_commands = step.get("canvas_commands", [])
+        component_commands = step.get("component_commands", [])
         
         # Enviar inicio del paso
         emit("step_start", {
@@ -134,6 +135,15 @@ class StreamingService:
         if canvas_commands:
             for command in canvas_commands:
                 emit("canvas_command", {
+                    "step": step_index,
+                    "command": command
+                })
+                time.sleep(0.1)
+        
+        # Enviar component commands si existen
+        if component_commands:
+            for command in component_commands:
+                emit("component_command", {
                     "step": step_index,
                     "command": command
                 })
@@ -296,6 +306,15 @@ class StreamingService:
                         })
                         time.sleep(0.1)
                 
+                # Component commands si existen
+                if step.get('has_visual') and step.get('component_commands'):
+                    for command in step['component_commands']:
+                        emit_func('component_command', {
+                            'step_number': step_number,
+                            'command': command
+                        })
+                        time.sleep(0.1)
+                
                 # Emit fin de paso
                 emit_func('step_complete', {
                     'step_number': step_number
@@ -341,6 +360,15 @@ class StreamingService:
                 if step.get('has_visual') and step.get('canvas_commands'):
                     for command in step['canvas_commands']:
                         emit_func('canvas_command', {
+                            'step_number': step_number,
+                            'command': command
+                        })
+                        time.sleep(0.1)
+                
+                # Component commands si existen
+                if step.get('has_visual') and step.get('component_commands'):
+                    for command in step['component_commands']:
+                        emit_func('component_command', {
                             'step_number': step_number,
                             'command': command
                         })
