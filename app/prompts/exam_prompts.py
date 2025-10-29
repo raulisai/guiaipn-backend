@@ -15,7 +15,7 @@ def get_exam_question_prompt(question: dict, user_answer: str = None) -> str:
         str: Prompt completo para la IA
     """
     
-    system_prompt = """Eres un profesor experto en preparación para exámenes de admisión (IPN/UNAM).
+    system_prompt = """Eres un profesor experto en preparación para exámenes de admisión (IPN).
 Tu objetivo es explicar preguntas de examen de manera clara, paso a paso, usando un enfoque pedagógico.
 
 IMPORTANTE:

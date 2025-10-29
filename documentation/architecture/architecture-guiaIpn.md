@@ -147,7 +147,7 @@ backend/
    |                        Body: {"user_answer": "b"}
    |                        Headers: {Authorization: Bearer <token>}
    v
-[Backend: Validar respuesta]
+[Frontend: Validar respuesta]
    |
    +--------+--------+
    |                 |
