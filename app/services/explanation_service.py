@@ -45,21 +45,24 @@ class ExplanationService:
     def generate_clarification(
         self,
         clarification_question: str,
-        current_context: dict
+        current_context: dict,
+        response_mode: str = "brief"
     ) -> Dict:
         """
-        Genera aclaración rápida
+        Genera aclaración según el modo solicitado
         
         Args:
             clarification_question: Pregunta del usuario
             current_context: Contexto actual
+            response_mode: "brief" para respuesta corta o "detailed" para explicación con pasos
             
         Returns:
-            dict: Aclaración estructurada
+            dict: Aclaración estructurada acorde al modo
         """
         return self.ai_service.generate_clarification(
             clarification_question,
-            current_context
+            current_context,
+            response_mode=response_mode
         )
     
     def generate_follow_up(

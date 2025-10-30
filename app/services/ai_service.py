@@ -355,23 +355,28 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
         self,
         clarification_question: str,
         current_context: dict,
+        response_mode: str = "brief",
         model: str = None
     ) -> Dict:
         """
-        Genera respuesta breve para interrupción/aclaración
+        Genera respuesta para interrupción/aclaración
         
         Args:
             clarification_question: Pregunta del usuario
             current_context: Contexto actual de la explicación
+            response_mode: "brief" para mensaje corto o "detailed" para pasos estructurados
             model: Modelo de OpenAI a usar (opcional)
             
         Returns:
-            dict: {
-                "clarification_steps": [...],
-                "total_duration": int
-            }
+            dict: dependiendo del modo solicitado
+                - brief: {"mode": "brief", "message": str, "is_deferred": bool, "reason": Optional[str]}
+                - detailed: {"mode": "detailed", "clarification_steps": [...], "total_duration": int}
         """
-        prompt = get_clarification_prompt(clarification_question, current_context)
+        prompt = get_clarification_prompt(
+            clarification_question,
+            current_context,
+            response_mode=response_mode
+        )
         model = model or self.DEFAULT_MODEL
         
         try:
