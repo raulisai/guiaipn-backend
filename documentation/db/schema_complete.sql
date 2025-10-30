@@ -44,6 +44,23 @@ CREATE TABLE profiles (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Respuestas breves de aclaraciones (modo brief)
+CREATE TABLE ai_brief_answers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    question_hash TEXT NOT NULL,
+    normalized_question TEXT NOT NULL,
+    context_hash TEXT NOT NULL,
+    context_data JSONB,
+    message TEXT NOT NULL,
+    is_deferred BOOLEAN DEFAULT FALSE,
+    reason TEXT,
+    usage_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX ai_brief_answers_question_context_idx
+    ON ai_brief_answers (question_hash, context_hash);
+
 -- Banco de preguntas del examen
 CREATE TABLE questions (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
