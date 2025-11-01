@@ -29,7 +29,14 @@ class Config:
     
     # OpenAI
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    
+
+    # Stripe
+    STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
+    STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID")
+    STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "http://localhost:5173/pagos/exito")
+    STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "http://localhost:5173/pagos/cancelado")
+    STRIPE_DEFAULT_CURRENCY = os.getenv("STRIPE_DEFAULT_CURRENCY", "mxn")
+
     # CORS
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
     
