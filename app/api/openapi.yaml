@@ -445,9 +445,9 @@ paths:
             default: 20
             minimum: 1
             maximum: 100
-        - name: category
+        - name: subject
           in: query
-          description: Filtrar por categoría
+          description: Filtrar por materia
           schema:
             type: string
         - name: difficulty
