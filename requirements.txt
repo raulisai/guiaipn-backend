@@ -4,12 +4,12 @@ Flask-SocketIO==5.3.5
 Flask-CORS==4.0.0
 flask-swagger-ui==4.11.1
 python-socketio==5.10.0
-gevent==24.2.1
+gevent
 gevent-websocket==0.10.1
 
 # Database & Cache
 supabase==2.10.0
-psycopg[binary]==3.1.16
+psycopg[binary]
 redis==5.0.1
 websockets>=13.0
 
@@ -38,3 +38,5 @@ fakeredis==2.20.1
 # Code Quality
 black==23.12.1
 flake8==6.1.0
+
+dotenv

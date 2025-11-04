@@ -116,7 +116,11 @@ REDIS_URL=redis://localhost:6379/0
 ```bash
 # Levantar todos los servicios
 docker-compose up -d
-
+#importantes con estos 2 se ve todo
+docker compose -f docker-compose.redis-only.yml up -d
+docker compose -f docker-compose.redis-only.yml logs -f
+# Para detener
+docker compose -f docker-compose.redis-only.yml down
 # Ver logs
 docker-compose logs -f backend
 
