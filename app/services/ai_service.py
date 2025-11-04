@@ -4,7 +4,8 @@ Genera respuestas estructuradas en formato JSON
 """
 import json
 import os
-from typing import Optional, Dict, List
+from typing import Optional, Dict
+
 from openai import OpenAI
 from app.config import Config
 from app.prompts import (
@@ -12,6 +13,8 @@ from app.prompts import (
     get_clarification_prompt,
     get_follow_up_prompt
 )
+from app.repositories.ai_brief_answers_repo import AIBriefAnswersRepository
+from app.utils.text_processing import normalize_text, generate_hash
 
 
 class AIResponseError(Exception):
@@ -355,25 +358,51 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
         self,
         clarification_question: str,
         current_context: dict,
+        response_mode: str = "brief",
         model: str = None
     ) -> Dict:
         """
-        Genera respuesta breve para interrupción/aclaración
+        Genera respuesta para interrupción/aclaración
         
         Args:
             clarification_question: Pregunta del usuario
             current_context: Contexto actual de la explicación
+            response_mode: "brief" para mensaje corto o "detailed" para pasos estructurados
             model: Modelo de OpenAI a usar (opcional)
             
         Returns:
-            dict: {
-                "clarification_steps": [...],
-                "total_duration": int
-            }
+            dict: dependiendo del modo solicitado
+                - brief: {"mode": "brief", "message": str, "is_deferred": bool, "reason": Optional[str]}
+                - detailed: {"mode": "detailed", "clarification_steps": [...], "total_duration": int}
         """
-        prompt = get_clarification_prompt(clarification_question, current_context)
+        prompt = get_clarification_prompt(
+            clarification_question,
+            current_context,
+            response_mode=response_mode
+        )
         model = model or self.DEFAULT_MODEL
-        
+
+        cache_repo: Optional[AIBriefAnswersRepository] = None
+        cache_entry = None
+        cache_meta = None
+
+        if response_mode == "brief":
+            cache_repo = AIBriefAnswersRepository()
+            cache_meta = self._build_clarification_cache_meta(
+                clarification_question,
+                current_context
+            )
+            cache_entry = cache_repo.get_by_hash(cache_meta["question_hash"])
+
+            if cache_entry:
+                cache_repo.increment_usage(cache_entry["id"])
+                return {
+                    "mode": "brief",
+                    "message": cache_entry.get("message"),
+                    "is_deferred": cache_entry.get("is_deferred", False),
+                    "reason": cache_entry.get("reason")
+                }
+
         try:
             response = self.client.chat.completions.create(
                 model=model,
@@ -384,15 +413,44 @@ Responde SOLO con el JSON, sin explicaciones adicionales."""
                 temperature=self.TEMPERATURE,
                 response_format={"type": "json_object"}
             )
-            
+
             content = response.choices[0].message.content
             parsed = json.loads(content)
-            
+
+            if response_mode == "brief" and parsed.get("mode", "brief") == "brief":
+                message = parsed.get("message")
+                if message and cache_repo and cache_meta:
+                    cache_repo.create({
+                        "question_hash": cache_meta["question_hash"],
+                        "normalized_question": cache_meta["normalized_question"],
+                        "context_hash": cache_meta["context_hash"],
+                        "context_data": cache_meta["context_data"],
+                        "message": message,
+                        "is_deferred": parsed.get("is_deferred", False),
+                        "reason": parsed.get("reason"),
+                        "usage_count": 1
+                    })
+
             return parsed
             
         except Exception as e:
             print(f"Error generando aclaración: {e}")
             raise AIResponseError(f"Error al generar aclaración: {str(e)}")
+    
+    def _build_clarification_cache_meta(
+        self,
+        clarification_question: str,
+        current_context: dict
+    ) -> Dict:
+        normalized_question = normalize_text(clarification_question)
+        question_hash = generate_hash(normalized_question)
+        context_hash = generate_hash(str(current_context))
+        return {
+            "question_hash": question_hash,
+            "normalized_question": normalized_question,
+            "context_hash": context_hash,
+            "context_data": current_context
+        }
     
     def generate_follow_up(
         self,

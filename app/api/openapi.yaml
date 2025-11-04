@@ -25,6 +25,8 @@ tags:
     description: Gestión del banco de preguntas
   - name: sessions
     description: Sesiones de estudio del usuario
+  - name: payments
+    description: Integraciones de pago con Stripe
   - name: health
     description: Health checks del servicio
 
@@ -271,6 +273,49 @@ components:
           type: string
           example: guiaipn-backend
 
+    CheckoutSession:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID de la sesión en Stripe
+        url:
+          type: string
+          format: uri
+          description: URL para redirigir al usuario al flujo de pago
+        status:
+          type: string
+          nullable: true
+          description: Estado de la sesión de checkout
+        amount_total:
+          type: integer
+          nullable: true
+          description: Monto total de la sesión en centavos
+        currency:
+          type: string
+          nullable: true
+          description: Moneda del cargo (ISO 4217)
+      required:
+        - id
+        - url
+
+    CreateCheckoutSessionRequest:
+      type: object
+      properties:
+        price_id:
+          type: string
+          description: ID del precio en Stripe; si no se envía se usa el configurado por defecto
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Cantidad de unidades a comprar
+
+    CreateCheckoutSessionResponse:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/CheckoutSession'
+
 paths:
   /health:
     get:
@@ -422,6 +467,59 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: "Error creando perfil: ..."
+
+  /api/v1/payments/checkout-session:
+    post:
+      summary: Crear sesión de checkout en Stripe
+      description: Crea una sesión de pago en Stripe y devuelve la URL para completar el checkout.
+      tags:
+        - payments
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCheckoutSessionRequest'
+            example:
+              price_id: price_123
+              quantity: 1
+      responses:
+        '201':
+          description: Sesión de checkout creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateCheckoutSessionResponse'
+        '400':
+          description: Petición inválida o configuración faltante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Stripe Price ID no configurado"
+        '401':
+          description: Token JWT ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Error comunicándose con Stripe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Error creando sesión de pago en Stripe: ..."
+        '500':
+          description: Error inesperado del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
                 
   /api/v1/questions/:
     get:
@@ -445,9 +543,9 @@ paths:
             default: 20
             minimum: 1
             maximum: 100
-        - name: category
+        - name: subject
           in: query
-          description: Filtrar por categoría
+          description: Filtrar por materia
           schema:
             type: string
         - name: difficulty
